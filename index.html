@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#102b49">
+  <meta name="description" content="AlcoCalc: calculate UK alcohol units, pure alcohol and sugar in drinks.">
+  <title>AlcoCalc</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#091827;color:#f5f9ff}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(160deg,#102b49,#091827 65%)}
+    main{max-width:560px;margin:auto;padding:calc(24px + env(safe-area-inset-top)) 18px calc(32px + env(safe-area-inset-bottom))}
+    header{margin-bottom:24px}h1{font-size:2.3rem;letter-spacing:-.05em;margin:0}h1 span{color:#ffcb45}p{color:#b9cadb;line-height:1.5;margin:8px 0 0}
+    .card{background:#17324e;border:1px solid #35516b;border-radius:22px;padding:20px;margin:16px 0;box-shadow:0 12px 28px #0002}
+    h2{font-size:1.05rem;margin:0 0 18px}label{display:block;font-weight:650;font-size:.92rem;margin:16px 0 7px}
+    input,select{width:100%;font:inherit;font-size:1.1rem;background:#091e32;color:white;border:1px solid #52708b;border-radius:12px;padding:13px;min-height:49px}
+    input:focus,select:focus{outline:2px solid #ffcb45;outline-offset:2px}.hint{font-size:.8rem;color:#b9cadb;margin-top:6px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.result{background:#0c253c;border-radius:15px;padding:16px;min-width:0}
+    .result small{display:block;color:#bed0df;font-size:.79rem;margin-bottom:8px}.result strong{display:block;color:#ffcb45;font-size:1.65rem;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+    .result em{display:block;color:#b9cadb;font-size:.75rem;font-style:normal;margin-top:4px}.error{color:#ffb5a9;min-height:1.3em;font-size:.9rem}
+    footer{color:#a8bacb;font-size:.78rem;line-height:1.5;margin-top:22px}
+    @media(max-width:350px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main>
+  <header><h1>🍺 Alco<span>Calc</span></h1><p>Your pocket calculator for drink sizes, alcohol strength and sugar.</p></header>
+  <section class="card" aria-labelledby="drink-heading">
+    <h2 id="drink-heading">Enter your drink</h2>
+    <label for="size">Bottle, can or serving size</label>
+    <select id="size">
+      <option value="25">25 ml — single spirit</option><option value="35">35 ml — spirit</option><option value="50">50 ml — double spirit</option>
+      <option value="125">125 ml — small wine</option><option value="175">175 ml — medium wine</option><option value="250">250 ml — large wine</option>
+      <option value="330">330 ml — can</option><option value="440">440 ml — can</option><option value="500" selected>500 ml — bottle/can</option>
+      <option value="568">568 ml — UK pint</option><option value="700">700 ml — bottle</option><option value="750">750 ml — wine bottle</option>
+      <option value="1000">1 litre</option><option value="custom">Custom size</option>
+    </select>
+    <div id="custom-wrap" hidden><label for="custom-size">Custom volume (ml)</label><input id="custom-size" type="number" min="0.1" step="any" inputmode="decimal" value="500"></div>
+    <label for="abv">Alcohol by volume (ABV %)</label><input id="abv" type="number" min="0" max="100" step="any" inputmode="decimal" value="5">
+    <label for="sugar">Sugar per 100 ml (g)</label><input id="sugar" type="number" min="0" step="any" inputmode="decimal" value="4">
+    <div class="hint">Find the ABV and sugar per 100 ml on the drink label. Enter 0 for sugar-free drinks.</div>
+    <p id="error" class="error" role="alert" aria-live="polite"></p>
+  </section>
+  <section class="card" aria-labelledby="results-heading">
+    <h2 id="results-heading">Your results</h2>
+    <div class="grid" aria-live="polite">
+      <div class="result"><small>UK alcohol units</small><strong id="units">2.50</strong><em>1 unit = 10 ml pure alcohol</em></div>
+      <div class="result"><small>Pure alcohol</small><strong id="alcohol">25 ml</strong><em>By volume</em></div>
+      <div class="result"><small>Total sugar</small><strong id="total-sugar">20 g</strong><em>In this serving</em></div>
+      <div class="result"><small>Sugar calories</small><strong id="calories">80 kcal</strong><em>Sugar only, not total drink calories</em></div>
+    </div>
+  </section>
+  <footer>AlcoCalc calculates estimates from the values you enter. UK units = volume (ml) × ABV (%) ÷ 1,000. Sugar calories use approximately 4 kcal per gram. This is not a blood-alcohol or driving-safety calculator.</footer>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const fields = ['size','custom-size','abv','sugar'];
+  const format = (value, digits = 1) => Number(value.toFixed(digits)).toLocaleString('en-GB', {maximumFractionDigits:digits});
+  function calculate(){
+    const custom = $('size').value === 'custom';
+    $('custom-wrap').hidden = !custom;
+    const volume = Number(custom ? $('custom-size').value : $('size').value);
+    const abv = Number($('abv').value);
+    const sugar = Number($('sugar').value);
+    const invalid = (custom && !$('custom-size').value.trim()) || !$('abv').value.trim() || !$('sugar').value.trim() ||
+      !Number.isFinite(volume) || volume <= 0 || !Number.isFinite(abv) || abv < 0 || abv > 100 || !Number.isFinite(sugar) || sugar < 0;
+    $('error').textContent = invalid ? 'Enter a positive volume, an ABV from 0 to 100, and sugar of 0 or more.' : '';
+    if(invalid){for(const id of ['units','alcohol','total-sugar','calories']) $(id).textContent = '—';return;}
+    const pureAlcohol = volume * abv / 100;
+    const totalSugar = volume * sugar / 100;
+    $('units').textContent = (pureAlcohol / 10).toFixed(2);
+    $('alcohol').textContent = format(pureAlcohol,2) + ' ml';
+    $('total-sugar').textContent = format(totalSugar,2) + ' g';
+    $('calories').textContent = format(totalSugar * 4,0) + ' kcal';
+  }
+  fields.forEach(id => {$(id).addEventListener('input',calculate);$(id).addEventListener('change',calculate);});
+  calculate();
+</script>
+</body>
+</html>
